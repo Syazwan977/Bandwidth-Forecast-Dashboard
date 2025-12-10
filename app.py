@@ -185,12 +185,13 @@ def build_summary_excel(
 ) -> bytes:
     """Create Excel report as bytes."""
     output = io.BytesIO()
-    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+    # use openpyxl instead of openpxl to avoid warning  about engine            
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
         # Sheet 1: Model metrics
         metrics_df = pd.DataFrame(best_metrics, index=[best_model_name])
         metrics_df.to_excel(writer, sheet_name="Model_Metrics")
 
-        # Sheet 2: Forecast vs Actual
+        # Sheet 2: Forecast vs Actual (hourly)
         fa = pd.DataFrame(
             {
                 "Actual_Required_Mbps": test.values,
@@ -292,7 +293,8 @@ def build_summary_pdf(
 st.set_page_config(page_title="Bandwidth Forecast Dashboard", layout="wide")
 
 # ---------- FORMAL DASHBOARD CSS (CARDS, TITLES, DECISION BOXES) ----------
-st.markdown("""
+st.markdown(
+    """
 <style>
 
 /* -----------------------------
@@ -356,7 +358,10 @@ st.markdown("""
 }
 
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
+
 
 def main():
     st.title("Bandwidth Forecast Dashboard (Single Location)")
@@ -805,7 +810,7 @@ This target capacity helps reduce congestion risk during peak usage hours while 
 
     pattern = ts_hourly.to_frame(name="Required_BW_Mbps").copy()
     pattern["dayofweek"] = pattern.index.dayofweek  # 0=Mon, 6=Sun
-    pattern["hour"] = pattern.index.hour           # 0–23
+    pattern["hour"] = pattern.index.hour  # 0–23
 
     pivot = pattern.pivot_table(
         index="dayofweek",
@@ -927,8 +932,15 @@ This helps the ISP spot recurring congestion patterns such as:
             mime="application/pdf",
         )
 
+    # 🔹 NOTE: Explain that full hourly forecast is inside the downloaded report
+    st.info(
+        "To view the full **hour-by-hour forecasting report** (including all timestamps), "
+        "please download the **Excel report** and open the sheet named **'Forecast_vs_Actual'**."
+    )
+
     st.markdown('</div>', unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
     main()
+
