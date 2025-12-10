@@ -7,3 +7,4 @@ prophet
 scikit-learn
 tensorflow
 reportlab
+openpyxl
