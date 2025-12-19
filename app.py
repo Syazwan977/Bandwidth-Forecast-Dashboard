@@ -515,13 +515,16 @@ def main():
     st.markdown('</div>', unsafe_allow_html=True)
 
 # B. FORECAST VS ACTUAL (MINUTE-LEVEL) -----------------------
-st.markdown('<div class="section-title">B. Forecast vs Actual (Minute-Level)</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="section-title">B. Forecast vs Actual (Minute-Level)</div>',
+    unsafe_allow_html=True
+)
 st.markdown('<div class="card">', unsafe_allow_html=True)
 
 fig, ax = plt.subplots(figsize=(12, 5))
 
-# Show last 12 hours of training for readability
-train_tail = train.iloc[-12*60:]
+# Show last 12 hours of training (12 × 60 minutes)
+train_tail = train.iloc[-12 * 60 :]
 
 ax.plot(
     train_tail.index,
@@ -578,28 +581,29 @@ fig.autofmt_xdate()
 
 st.pyplot(fig)
 
-st.markdown('</div>', unsafe_allow_html=True)
+# ---- Interpretation text (SAFE & CLEAN) -------------------
+st.markdown(
+    f"""
+### How to interpret this chart
 
-    st.markdown(
-        f"""
-**How to interpret this chart**
+- **Train**: Historical minute-level demand used to fit the model  
+- **Test (Actual)**: Real observed demand  
+- **Forecast ({best_model_name})**: Predicted bandwidth requirement  
 
-- Train: historical demand used to fit the model.
-- Test (Actual): real demand in the evaluation window.
-- Forecast ({best_model_name}): model prediction over the same period.
-- If the forecast line is *below* the actual line, there is risk of under-provisioning and congestion.
-- If the forecast line is *above* the actual line, capacity may be over-allocated.
+**Operational meaning for ISP**
+- Forecast **below actual** → risk of congestion  
+- Forecast **above actual** → potential over-provisioning  
 
-**Model accuracy for the selected location**
-
+### Model accuracy (selected location)
 - RMSE: {best_metrics['RMSE']:.2f} Mbps  
 - MAE: {best_metrics['MAE']:.2f} Mbps  
 - MAPE: {best_metrics['MAPE']:.2f}%  
 - R²: {best_metrics['R2']:.2f}
 """
-    )
+)
 
-    st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
+
 
     # C. CAPACITY RECOMMENDATION & RISK HOURS ------------------
     st.markdown('<div class="section-title">C. Capacity Recommendation & Congestion Risk Hours</div>', unsafe_allow_html=True)
@@ -936,5 +940,6 @@ This helps the ISP spot recurring congestion patterns such as:
 
 if __name__ == "__main__":
     main()
+
 
 
