@@ -514,78 +514,71 @@ def main():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # B. FORECAST VS ACTUAL (BEST MODEL) -----------------------
-    st.markdown('<div class="section-title">B. Forecast vs Actual (Best Model)</div>', unsafe_allow_html=True)
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+# B. FORECAST VS ACTUAL (MINUTE-LEVEL) -----------------------
+st.markdown('<div class="section-title">B. Forecast vs Actual (Minute-Level)</div>', unsafe_allow_html=True)
+st.markdown('<div class="card">', unsafe_allow_html=True)
 
-    history_days = min(3, test_days)
-    history_points = history_days * 24
-    train_tail = train.iloc[-history_points:]
+fig, ax = plt.subplots(figsize=(12, 5))
 
-    fig, ax = plt.subplots(figsize=(12, 5))
+# Show last 12 hours of training for readability
+train_tail = train.iloc[-12*60:]
 
-    ax.plot(
-        train_tail.index,
-        train_tail.values,
-        label=f"Train (last {history_days} days)",
-        linewidth=1,
-    )
-    ax.plot(
-        test.index,
-        test.values,
-        label="Test (Actual)",
-        linewidth=2,
-    )
-    ax.plot(
-        best_forecast.index,
-        best_forecast.values,
-        label=f"Forecast ({best_model_name})",
-        linewidth=2,
-    )
+ax.plot(
+    train_tail.index,
+    train_tail.values,
+    label="Train (Last 12 Hours)",
+    linewidth=1
+)
 
-    # overlay allocated bandwidth if available
-    alloc_ts_hourly = None
-    if "Allocated_Bandwidth" in df.columns:
-        alloc_ts_min = df["Allocated_Bandwidth"].asfreq("min").interpolate()
-        alloc_ts_hourly = alloc_ts_min.resample("h").mean()
-        alloc_test = alloc_ts_hourly.reindex(test.index)
-        ax.plot(
-            alloc_test.index,
-            alloc_test.values,
-            label="Allocated BW (Hourly Avg)",
-            linewidth=1.5,
-            linestyle=":",
-        )
+ax.plot(
+    test.index,
+    test.values,
+    label="Test (Actual)",
+    linewidth=2
+)
 
-    ax.axvline(
-        x=test.index[0],
-        color="black",
-        linestyle="--",
-        linewidth=1,
-        alpha=0.8,
-    )
-    ax.text(
-        test.index[0],
-        ax.get_ylim()[1],
-        "  Train -> Test",
-        va="top",
-        ha="left",
-        fontsize=9,
-    )
+# Align forecast strictly to test window
+forecast_min = best_forecast.reindex(test.index)
 
-    ax.set_xlabel("Time")
-    ax.set_ylabel("Required Bandwidth (Mbps)")
+ax.plot(
+    test.index,
+    forecast_min.values,
+    label=f"Forecast ({best_model_name})",
+    linewidth=2
+)
 
-    locator = AutoDateLocator()
-    formatter = DateFormatter("%Y-%m-%d\n%H:%M")
-    ax.xaxis.set_major_locator(locator)
-    ax.xaxis.set_major_formatter(formatter)
+# Train/Test split line
+ax.axvline(
+    x=test.index[0],
+    color="black",
+    linestyle="--",
+    linewidth=1
+)
 
-    fig.autofmt_xdate()
-    ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.7)
-    ax.legend()
+ax.text(
+    test.index[0],
+    ax.get_ylim()[1],
+    "  Train → Test",
+    va="top",
+    fontsize=9
+)
 
-    st.pyplot(fig)
+ax.set_title("Minute-Level Bandwidth Forecast vs Actual")
+ax.set_xlabel("Time")
+ax.set_ylabel("Required Bandwidth (Mbps)")
+
+locator = AutoDateLocator()
+formatter = DateFormatter("%d %b\n%H:%M")
+ax.xaxis.set_major_locator(locator)
+ax.xaxis.set_major_formatter(formatter)
+
+ax.grid(True, linestyle="--", alpha=0.6)
+ax.legend()
+fig.autofmt_xdate()
+
+st.pyplot(fig)
+
+st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown(
         f"""
@@ -943,4 +936,5 @@ This helps the ISP spot recurring congestion patterns such as:
 
 if __name__ == "__main__":
     main()
+
 
