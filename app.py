@@ -514,58 +514,100 @@ def main():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-   # B. HOURLY PATTERN: CURRENT WEEK vs NEXT WEEK FORECAST
-st.markdown(
-    '<div class="section-title">B. Hourly Bandwidth Pattern: Current Week vs Next Week Forecast</div>',
-    unsafe_allow_html=True
-)
-st.markdown('<div class="card">', unsafe_allow_html=True)
 
-fig, ax = plt.subplots(figsize=(12, 5))
+    # B. FORECAST VS ACTUAL (BEST MODEL) -----------------------
+    st.markdown('<div class="section-title">B. Forecast vs Actual (Best Model)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card">', unsafe_allow_html=True)
 
-ax.plot(
-    hourly_train_mean.index,
-    hourly_train_mean.values,
-    marker="o",
-    linewidth=2,
-    label="Current Week (Actual)"
-)
+    history_days = min(3, test_days)
+    history_points = history_days * 24
+    train_tail = train.iloc[-history_points:]
 
-ax.plot(
-    hourly_forecast_mean.index,
-    hourly_forecast_mean.values,
-    marker="o",
-    linestyle="--",
-    linewidth=2,
-    label=f"Next Week Forecast ({best_model_name})"
-)
+    fig, ax = plt.subplots(figsize=(12, 5))
 
-ax.set_xticks(range(24))
-ax.set_xlabel("Hour of Day")
-ax.set_ylabel("Average Required Bandwidth (Mbps)")
-ax.set_title("Hourly Bandwidth Usage Pattern (0–23)")
+    ax.plot(
+        train_tail.index,
+        train_tail.values,
+        label=f"Train (last {history_days} days)",
+        linewidth=1,
+    )
+    ax.plot(
+        test.index,
+        test.values,
+        label="Test (Actual)",
+        linewidth=2,
+    )
+    ax.plot(
+        best_forecast.index,
+        best_forecast.values,
+        label=f"Forecast ({best_model_name})",
+        linewidth=2,
+    )
 
-ax.grid(True, linestyle="--", alpha=0.6)
-ax.legend()
+    # overlay allocated bandwidth if available
+    alloc_ts_hourly = None
+    if "Allocated_Bandwidth" in df.columns:
+        alloc_ts_min = df["Allocated_Bandwidth"].asfreq("min").interpolate()
+        alloc_ts_hourly = alloc_ts_min.resample("h").mean()
+        alloc_test = alloc_ts_hourly.reindex(test.index)
+        ax.plot(
+            alloc_test.index,
+            alloc_test.values,
+            label="Allocated BW (Hourly Avg)",
+            linewidth=1.5,
+            linestyle=":",
+        )
 
-st.pyplot(fig)
+    ax.axvline(
+        x=test.index[0],
+        color="black",
+        linestyle="--",
+        linewidth=1,
+        alpha=0.8,
+    )
+    ax.text(
+        test.index[0],
+        ax.get_ylim()[1],
+        "  Train -> Test",
+        va="top",
+        ha="left",
+        fontsize=9,
+    )
 
-st.markdown(
-    """
-### Interpretation
+    ax.set_xlabel("Time")
+    ax.set_ylabel("Required Bandwidth (Mbps)")
 
-- **X-axis (0–23)**: Hour of day
-- **Current Week**: Actual observed QoS demand
-- **Next Week Forecast**: Expected hourly demand pattern
+    locator = AutoDateLocator()
+    formatter = DateFormatter("%Y-%m-%d\n%H:%M")
+    ax.xaxis.set_major_locator(locator)
+    ax.xaxis.set_major_formatter(formatter)
 
-**Operational meaning**
-- Forecast curve above current → growing demand risk
-- Similar shape → stable usage behavior
-- Higher evening peaks → capacity scaling needed during peak hours
+    fig.autofmt_xdate()
+    ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.7)
+    ax.legend()
+
+    st.pyplot(fig)
+
+    st.markdown(
+        f"""
+**How to interpret this chart**
+
+- Train: historical demand used to fit the model.
+- Test (Actual): real demand in the evaluation window.
+- Forecast ({best_model_name}): model prediction over the same period.
+- If the forecast line is *below* the actual line, there is risk of under-provisioning and congestion.
+- If the forecast line is *above* the actual line, capacity may be over-allocated.
+
+**Model accuracy for the selected location**
+
+- RMSE: {best_metrics['RMSE']:.2f} Mbps  
+- MAE: {best_metrics['MAE']:.2f} Mbps  
+- MAPE: {best_metrics['MAPE']:.2f}%  
+- R²: {best_metrics['R2']:.2f}
 """
-)
+    )
 
-st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 
@@ -904,6 +946,7 @@ This helps the ISP spot recurring congestion patterns such as:
 
 if __name__ == "__main__":
     main()
+
 
 
 
