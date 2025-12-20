@@ -514,94 +514,58 @@ def main():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # B. FORECAST VS ACTUAL (MINUTE-LEVEL) -----------------------
-    st.markdown(
-        '<div class="section-title">B. Forecast vs Actual (Minute-Level)</div>',
-        unsafe_allow_html=True
-    )
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+   # B. HOURLY PATTERN: CURRENT WEEK vs NEXT WEEK FORECAST
+st.markdown(
+    '<div class="section-title">B. Hourly Bandwidth Pattern: Current Week vs Next Week Forecast</div>',
+    unsafe_allow_html=True
+)
+st.markdown('<div class="card">', unsafe_allow_html=True)
 
-    fig, ax = plt.subplots(figsize=(12, 5))
+fig, ax = plt.subplots(figsize=(12, 5))
 
-    # Show last 12 hours of training (12 × 60 minutes)
-    train_tail = train.iloc[-12 * 60:]
+ax.plot(
+    hourly_train_mean.index,
+    hourly_train_mean.values,
+    marker="o",
+    linewidth=2,
+    label="Current Week (Actual)"
+)
 
-    ax.plot(
-        train_tail.index,
-        train_tail.values,
-        label="Train (Last 12 Hours)",
-        linewidth=1
-    )
+ax.plot(
+    hourly_forecast_mean.index,
+    hourly_forecast_mean.values,
+    marker="o",
+    linestyle="--",
+    linewidth=2,
+    label=f"Next Week Forecast ({best_model_name})"
+)
 
-    ax.plot(
-        test.index,
-        test.values,
-        label="Test (Actual)",
-        linewidth=2
-    )
+ax.set_xticks(range(24))
+ax.set_xlabel("Hour of Day")
+ax.set_ylabel("Average Required Bandwidth (Mbps)")
+ax.set_title("Hourly Bandwidth Usage Pattern (0–23)")
 
-    # Align forecast strictly to test window
-    forecast_min = best_forecast.reindex(test.index)
+ax.grid(True, linestyle="--", alpha=0.6)
+ax.legend()
 
-    ax.plot(
-        test.index,
-        forecast_min.values,
-        label=f"Forecast ({best_model_name})",
-        linewidth=2
-    )
+st.pyplot(fig)
 
-    # Train/Test split line
-    ax.axvline(
-        x=test.index[0],
-        color="black",
-        linestyle="--",
-        linewidth=1
-    )
+st.markdown(
+    """
+### Interpretation
 
-    ax.text(
-        test.index[0],
-        ax.get_ylim()[1],
-        "  Train → Test",
-        va="top",
-        fontsize=9
-    )
+- **X-axis (0–23)**: Hour of day
+- **Current Week**: Actual observed QoS demand
+- **Next Week Forecast**: Expected hourly demand pattern
 
-    ax.set_title("Minute-Level Bandwidth Forecast vs Actual")
-    ax.set_xlabel("Time")
-    ax.set_ylabel("Required Bandwidth (Mbps)")
-
-    locator = AutoDateLocator()
-    formatter = DateFormatter("%d %b\n%H:%M")
-    ax.xaxis.set_major_locator(locator)
-    ax.xaxis.set_major_formatter(formatter)
-
-    ax.grid(True, linestyle="--", alpha=0.6)
-    ax.legend()
-    fig.autofmt_xdate()
-
-    st.pyplot(fig)
-
-    st.markdown(
-        f"""
-### How to interpret this chart
-
-- **Train**: Historical minute-level demand used to fit the model  
-- **Test (Actual)**: Real observed demand  
-- **Forecast ({best_model_name})**: Predicted bandwidth requirement  
-
-**Operational meaning for ISP**
-- Forecast **below actual** → risk of congestion  
-- Forecast **above actual** → potential over-provisioning  
-
-### Model accuracy (selected location)
-- RMSE: {best_metrics['RMSE']:.2f} Mbps  
-- MAE: {best_metrics['MAE']:.2f} Mbps  
-- MAPE: {best_metrics['MAPE']:.2f}%  
-- R²: {best_metrics['R2']:.2f}
+**Operational meaning**
+- Forecast curve above current → growing demand risk
+- Similar shape → stable usage behavior
+- Higher evening peaks → capacity scaling needed during peak hours
 """
-    )
+)
 
-    st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
 
 
@@ -940,6 +904,7 @@ This helps the ISP spot recurring congestion patterns such as:
 
 if __name__ == "__main__":
     main()
+
 
 
 
