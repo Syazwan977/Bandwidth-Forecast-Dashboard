@@ -403,8 +403,8 @@ def main():
             st.sidebar.warning("Location column is present but empty.")
         else:
             default_idx = 0
-            if "Sungai Besi" in locations:
-                default_idx = locations.index("Sungai Besi")
+            if "Location X" in locations:
+                default_idx = locations.index("Location X")
             selected_location = st.sidebar.selectbox(
                 "Select Location",
                 locations,
@@ -946,6 +946,7 @@ This helps the ISP spot recurring congestion patterns such as:
 
 if __name__ == "__main__":
     main()
+
 
 
 
