@@ -73,7 +73,7 @@ def eval_metrics(true, pred):
 
 
 def run_arima(train, test):
-    model = sm.tsa.ARIMA(train, order=(2, 1, 2))
+    model = sm.tsa.ARIMA(train, order=(1, 1, 3))
     res = model.fit()
     forecast = res.forecast(steps=len(test))
     rmse, mae, mape, r2 = eval_metrics(test.values, forecast.values)
@@ -946,6 +946,7 @@ This helps the ISP spot recurring congestion patterns such as:
 
 if __name__ == "__main__":
     main()
+
 
 
 
