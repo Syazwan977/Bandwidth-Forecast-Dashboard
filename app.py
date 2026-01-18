@@ -49,14 +49,20 @@ def prepare_time_series(df: pd.DataFrame, target_col: str = "Required_Bandwidth"
 
 
 def train_test_split_series(ts: pd.Series, test_days: int = 7):
-    """Split hourly series into train and test using last test_days days as test."""
-    points_per_day = 24  # hourly
-    horizon = points_per_day * test_days
-    if len(ts) <= horizon:
-        raise ValueError("Time series is too short relative to test period.")
-    train = ts.iloc[:-horizon]
-    test = ts.iloc[-horizon:]
-    return train, test
+# 1. Calculate points for 5 days of training
+points_per_day = 24
+train_size = points_per_day * 5  # Fixed 5 days for training
+
+# 2. Re-split the series
+# This ensures the first 5 days are used for training
+train = ts_hourly.iloc[:train_size] 
+
+# 3. The remaining data becomes the test set
+test = ts_hourly.iloc[train_size:] 
+
+# Update the display info
+st.write(f"Train (Fixed 5 Days): {train.index[0]} -> {train.index[-1]}")
+st.write(f"Test (Remaining): {test.index[0]} -> {test.index[-1]}")
 
 
 def eval_metrics(true, pred):
@@ -946,6 +952,7 @@ This helps the ISP spot recurring congestion patterns such as:
 
 if __name__ == "__main__":
     main()
+
 
 
 
