@@ -49,20 +49,19 @@ def prepare_time_series(df: pd.DataFrame, target_col: str = "Required_Bandwidth"
 
 
 def train_test_split_series(ts: pd.Series, test_days: int = 7):
-# 1. Calculate points for 5 days of training
-points_per_day = 24
-train_size = points_per_day * 5  # Fixed 5 days for training
-
-# 2. Re-split the series
-# This ensures the first 5 days are used for training
-train = ts_hourly.iloc[:train_size] 
-
-# 3. The remaining data becomes the test set
-test = ts_hourly.iloc[train_size:] 
-
-# Update the display info
-st.write(f"Train (Fixed 5 Days): {train.index[0]} -> {train.index[-1]}")
-st.write(f"Test (Remaining): {test.index[0]} -> {test.index[-1]}")
+    """Split hourly series into train and test using first 5 days for training."""
+    points_per_day = 24  # hourly frequency
+    train_size = points_per_day * 5  # Fixed 5 days (120 points)
+    
+    if len(ts) <= train_size:
+        raise ValueError(f"Time series only has {len(ts)} points. Need more than {train_size} for 5-day training.")
+    
+    # The first 5 days are for training 
+    train = ts.iloc[:train_size] 
+    # Everything after the 5th day is for testing [cite: 877, 883]
+    test = ts.iloc[train_size:] 
+    
+    return train, test
 
 
 def eval_metrics(true, pred):
