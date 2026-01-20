@@ -48,31 +48,14 @@ def prepare_time_series(df: pd.DataFrame, target_col: str = "Required_Bandwidth"
     return ts_hourly
 
 
-def train_test_split_series(
-    ts: pd.Series,
-    train_days: int = 5,
-    test_days: int = 2,
-    use_most_recent_window: bool = True,
-):
-    """Split hourly series into a fixed 5-day train and 2-day test window (hourly).
-
-    To keep evaluation consistent, this takes exactly (train_days + test_days) days.
-    If the series is longer than that, the most recent window is used by default.
-    """
+def train_test_split_series(ts: pd.Series, test_days: int = 7):
+    """Split hourly series into train and test using last test_days days as test."""
     points_per_day = 24  # hourly
-    train_size = points_per_day * train_days
-    test_size = points_per_day * test_days
-    total_size = train_size + test_size
-
-    if len(ts) < total_size:
-        raise ValueError(
-            f"Time series only has {len(ts)} points. Need at least {total_size} points "
-            f"({train_days} train days + {test_days} test days)."
-        )
-
-    ts_window = ts.iloc[-total_size:] if use_most_recent_window else ts.iloc[:total_size]
-    train = ts_window.iloc[:train_size]
-    test = ts_window.iloc[train_size:]
+    horizon = points_per_day * test_days
+    if len(ts) <= horizon:
+        raise ValueError("Time series is too short relative to test period.")
+    train = ts.iloc[:-horizon]
+    test = ts.iloc[-horizon:]
     return train, test
 
 
@@ -90,7 +73,7 @@ def eval_metrics(true, pred):
 
 
 def run_arima(train, test):
-    model = sm.tsa.ARIMA(train, order=(1, 1, 3))
+    model = sm.tsa.ARIMA(train, order=(2, 1, 2))
     res = model.fit()
     forecast = res.forecast(steps=len(test))
     rmse, mae, mape, r2 = eval_metrics(test.values, forecast.values)
@@ -392,10 +375,7 @@ def main():
         "expandedBootstrapping_quality_of_service_5g.csv",
     )
 
-    # Fixed split for this project: 5 days train + 2 days test (hourly)
-    train_days = 5
-    test_days = 2
-    st.sidebar.info(f"Data split: {train_days} days train + {test_days} days test (hourly)")
+    test_days = st.sidebar.slider("Test horizon (days)", 3, 14, 7)
 
     # Load data ------------------------------------------------
     try:
@@ -443,12 +423,7 @@ def main():
     # Prepare time series --------------------------------------
     try:
         ts_hourly = prepare_time_series(df, target_col="Required_Bandwidth")
-        train, test = train_test_split_series(
-            ts_hourly,
-            train_days=train_days,
-            test_days=test_days,
-            use_recent_window=True,
-        )
+        train, test = train_test_split_series(ts_hourly, test_days=test_days)
     except Exception as e:
         st.error(f"Error preparing time series: {e}")
         return
@@ -971,9 +946,6 @@ This helps the ISP spot recurring congestion patterns such as:
 
 if __name__ == "__main__":
     main()
-
-
-
 
 
 
