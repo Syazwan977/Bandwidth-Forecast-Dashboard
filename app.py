@@ -375,7 +375,7 @@ def main():
         "expandedBootstrapping_quality_of_service_5g.csv",
     )
 
-    test_days = st.sidebar.slider("Test horizon (days)", 2, 14, 7)
+    test_days = st.sidebar.slider("Test horizon (days)", 2, 5, 2)
 
     # Load data ------------------------------------------------
     try:
@@ -946,6 +946,7 @@ This helps the ISP spot recurring congestion patterns such as:
 
 if __name__ == "__main__":
     main()
+
 
 
 
