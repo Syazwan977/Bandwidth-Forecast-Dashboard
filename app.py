@@ -28,6 +28,129 @@ TOTAL_POINTS = TOTAL_DAYS * POINTS_PER_DAY
 
 
 # 1. HELPER FUNCTIONS -----------------------------------------------------
+def render_next_week_pattern_forecast(train: pd.Series, best_model_name: str):
+    # B2. NEXT WEEK PATTERN FORECAST (MON–SUN) -----------------------
+    st.markdown('<div class="section-title">B2. Next Week Pattern Forecast (Mon–Sun)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+
+    next_week_steps = 7 * 24
+    last_train_time = train.index[-1]
+    next_start = (last_train_time + pd.Timedelta(hours=1)).floor("h")
+    next_week_index = pd.date_range(start=next_start, periods=next_week_steps, freq="h")
+
+    def forecast_next_week(best_name: str, train_series: pd.Series, steps: int, future_index: pd.DatetimeIndex) -> pd.Series:
+        # ARIMA
+        if best_name == "ARIMA":
+            m = sm.tsa.ARIMA(train_series, order=(2, 1, 2)).fit()
+            yhat = m.forecast(steps=steps)
+            return pd.Series(yhat.values, index=future_index)
+
+        # SARIMA
+        if best_name == "SARIMA":
+            m = SARIMAX(
+                train_series,
+                order=(1, 1, 1),
+                seasonal_order=(1, 0, 1, 24),
+                enforce_stationarity=False,
+                enforce_invertibility=False,
+            ).fit(disp=False)
+            yhat = m.forecast(steps=steps)
+            return pd.Series(np.array(yhat), index=future_index)
+
+        # Prophet
+        if best_name == "Prophet":
+            df_train_p = train_series.reset_index()
+            df_train_p.columns = ["ds", "y"]
+            m = Prophet(daily_seasonality=True, weekly_seasonality=True)
+            m.fit(df_train_p)
+
+            future = m.make_future_dataframe(periods=steps, freq="h")
+            fc = m.predict(future)
+            yhat = fc.iloc[-steps:]["yhat"].values
+            return pd.Series(yhat, index=future_index)
+
+        # LSTM (recursive multi-step)
+        scaler = MinMaxScaler()
+        scaled = scaler.fit_transform(train_series.values.reshape(-1, 1))
+
+        lookback = 24
+        X_train, y_train = [], []
+        for i in range(len(scaled) - lookback):
+            X_train.append(scaled[i:i + lookback])
+            y_train.append(scaled[i + lookback])
+        X_train = np.array(X_train)
+        y_train = np.array(y_train)
+
+        model = Sequential()
+        model.add(LSTM(64, input_shape=(lookback, 1)))
+        model.add(Dense(1))
+        model.compile(optimizer="adam", loss="mse")
+        model.fit(
+            X_train,
+            y_train,
+            epochs=30,
+            batch_size=32,
+            validation_split=0.1,
+            callbacks=[EarlyStopping(patience=5, restore_best_weights=True)],
+            verbose=0,
+        )
+
+        window = scaled[-lookback:].copy()
+        preds_scaled = []
+        for _ in range(steps):
+            x = window.reshape(1, lookback, 1)
+            yhat_s = model.predict(x, verbose=0)[0, 0]
+            preds_scaled.append(yhat_s)
+            window = np.vstack([window[1:], [[yhat_s]]])
+
+        preds = scaler.inverse_transform(np.array(preds_scaled).reshape(-1, 1)).flatten()
+        return pd.Series(preds, index=future_index)
+
+    next_week_forecast = forecast_next_week(best_model_name, train, next_week_steps, next_week_index)
+
+    # Plot: last 5 days of train + next week forecast
+    history_days_to_show = 5
+    train_tail = train.iloc[-history_days_to_show * 24:]
+
+    fig, ax = plt.subplots(figsize=(12, 5))
+    ax.plot(train_tail.index, train_tail.values, label=f"Train (last {history_days_to_show} days)", linewidth=1.5)
+    ax.plot(next_week_forecast.index, next_week_forecast.values, label=f"Next Week Forecast — {best_model_name}", linewidth=2.2)
+
+    ax.axvline(x=next_week_forecast.index[0], color="black", linestyle="--", linewidth=1, alpha=0.8)
+    ax.set_xlabel("Time")
+    ax.set_ylabel("Required Bandwidth (Mbps)")
+    ax.xaxis.set_major_locator(AutoDateLocator())
+    ax.xaxis.set_major_formatter(DateFormatter("%a\n%Y-%m-%d\n%H:%M"))
+    fig.autofmt_xdate()
+    ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.7)
+    ax.legend()
+    st.pyplot(fig)
+
+    # Heatmap for forecasted next week pattern
+    st.markdown("### Next Week Forecast Heatmap (Day of Week × Hour)")
+
+    nw = next_week_forecast.to_frame("Forecast_Required_Mbps")
+    nw["dayofweek"] = nw.index.dayofweek
+    nw["hour"] = nw.index.hour
+
+    pivot_nw = nw.pivot_table(index="dayofweek", columns="hour", values="Forecast_Required_Mbps", aggfunc="mean")
+    pivot_nw = pivot_nw.reindex(index=list(range(7)), columns=list(range(24)))
+    day_labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+    fig_hm, ax_hm = plt.subplots(figsize=(12, 4))
+    im = ax_hm.imshow(pivot_nw.values, aspect="auto")
+    ax_hm.set_xticks(range(24))
+    ax_hm.set_xticklabels(list(range(24)))
+    ax_hm.set_yticks(range(7))
+    ax_hm.set_yticklabels(day_labels)
+    ax_hm.set_xlabel("Hour of Day")
+    ax_hm.set_ylabel("Day of Week")
+    ax_hm.set_title(f"Next Week Forecast Pattern — {best_model_name}")
+    cbar = plt.colorbar(im, ax=ax_hm)
+    cbar.set_label("Forecast Required Bandwidth (Mbps)")
+    st.pyplot(fig_hm)
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 def load_data(path: str) -> pd.DataFrame:
@@ -467,6 +590,9 @@ def main():
         best_forecast = prophet_forecast
     else:
         best_forecast = lstm_forecast
+
+     render_next_week_pattern_forecast(train, best_model_name)
+
 
     # A. REAL-TIME NETWORK STATUS PANEL ------------------------
     st.markdown("## A. Real-Time Network Status Panel")
@@ -931,5 +1057,6 @@ This helps the ISP spot recurring congestion patterns such as:
 
 if __name__ == "__main__":
     main()
+
 
 
